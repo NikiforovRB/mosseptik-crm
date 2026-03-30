@@ -32,8 +32,8 @@ export default async function Home({
             clients: {
               where:
                 user.role === "ADMIN"
-                  ? {}
-                  : { assignedManagerId: user.id },
+                  ? { isDealDeleted: false }
+                  : { assignedManagerId: user.id, isDealDeleted: false },
               orderBy: { orderInStage: "asc" },
               select: {
                 id: true,
@@ -93,7 +93,9 @@ export default async function Home({
       <div
         style={{
           background: "#e5e8ed",
-          minHeight: "calc(100vh - 64px)",
+          height: "calc(100vh - 64px)",
+          display: "grid",
+          gridTemplateRows: "auto 1fr",
         }}
       >
         <HomeTopBar selectedSection={selectedSection} />

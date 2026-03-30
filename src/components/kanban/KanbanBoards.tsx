@@ -121,13 +121,17 @@ export default function KanbanBoards({ initial }: { initial: KanbanFunnel[] }) {
   }
 
   return (
-    <div style={{ display: "grid", gap: 18, padding: 16 }}>
+    <div
+      style={{
+        display: "grid",
+        gap: 18,
+        padding: "13px 16px 16px 16px",
+        overflowX: "auto",
+        overflowY: "visible",
+      }}
+    >
       {funnels.map((f) => (
-        <section key={f.id} style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontWeight: 900, fontSize: 16, color: "#000000" }}>
-            {f.name}
-          </div>
-
+        <section key={f.id} style={{ display: "grid", gap: 10, minWidth: "max-content" }}>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
@@ -207,10 +211,9 @@ export default function KanbanBoards({ initial }: { initial: KanbanFunnel[] }) {
                 style={{
                   display: "grid",
                   gridAutoFlow: "column",
-                  gridAutoColumns: "minmax(280px, 1fr)",
+                  gridAutoColumns: "minmax(300px, 300px)",
                   gap: 12,
-                  overflowX: "auto",
-                  paddingBottom: 8,
+                  paddingBottom: 10,
                 }}
               >
                 {f.stages

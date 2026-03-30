@@ -35,6 +35,9 @@ export default async function ClientPage({
     },
   });
   if (!client) notFound();
+  if (client.isDealDeleted) {
+    redirect("/clients");
+  }
 
   if (user.role !== "ADMIN" && client.assignedManagerId !== user.id) {
     redirect("/");

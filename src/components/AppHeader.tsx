@@ -6,6 +6,7 @@ import {
   SlidersHorizontal,
   Truck,
   LogOut,
+  Contact,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -84,6 +85,10 @@ export default function AppHeader() {
               </Link>
             </>
           ) : null}
+          <Link href="/clients" title="Клиенты" style={clientsLinkStyle}>
+            <Contact size={16} />
+            <span>Клиенты</span>
+          </Link>
         </div>
       </div>
 
@@ -149,5 +154,17 @@ const iconLinkStyle: React.CSSProperties = {
   display: "grid",
   placeItems: "center",
   border: "1px solid rgba(255,255,255,0.15)",
+};
+
+const clientsLinkStyle: React.CSSProperties = {
+  height: 34,
+  borderRadius: 10,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  border: "1px solid rgba(255,255,255,0.15)",
+  padding: "0 10px",
+  color: "#fff",
+  fontSize: 13,
 };
 

@@ -40,9 +40,12 @@ export async function POST(req: Request) {
 
   const client = await prisma.client.findUnique({
     where: { id: clientId },
-    select: { id: true, assignedManagerId: true },
+    select: { id: true, assignedManagerId: true, isDealDeleted: true },
   });
   if (!client) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (client.isDealDeleted) {
+    return NextResponse.json({ error: "deal_deleted" }, { status: 400 });
+  }
 
   if (role !== "ADMIN" && client.assignedManagerId !== userId) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });

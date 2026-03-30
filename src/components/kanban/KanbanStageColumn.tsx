@@ -19,7 +19,7 @@ export default function KanbanStageColumn({
       ref={setNodeRef}
       style={{
         background: "transparent",
-        borderRadius: 14,
+        borderRadius: 0,
         border: "none",
         overflow: "visible",
         minHeight: 200,
@@ -28,15 +28,16 @@ export default function KanbanStageColumn({
     >
       <div
         style={{
-          padding: "10px 12px",
-          background: stage.headerColor,
+          padding: "10px 0 6px 0",
+          background: "transparent",
           color: "#000000",
           fontWeight: 500,
-          fontSize: 13,
+          fontSize: 15,
           display: "flex",
           alignItems: "center",
           gap: 8,
-          borderRadius: 14,
+          borderBottom: `4px solid ${stage.headerColor}`,
+          borderRadius: 0,
         }}
       >
         <span>{stage.name}</span>

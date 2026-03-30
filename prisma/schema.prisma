@@ -67,6 +67,7 @@ model Client {
   moneyProgress       MoneyProgress   @default(ASSIGNED)
   gsoType             GsoType         @default(GSO1)
   isUrgent            Boolean         @default(false)
+  isDealDeleted       Boolean         @default(false)
   lastCommunicationAt DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt

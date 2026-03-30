@@ -54,6 +54,8 @@ export default function ClientDetail({
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [savingClient, setSavingClient] = useState(false);
+  const [deletingDeal, setDeletingDeal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const title = `${client.firstName} ${client.lastName}`.trim();
 
@@ -103,6 +105,25 @@ export default function ClientDetail({
         </Link>
 
         <div style={{ marginTop: 12, fontSize: 16 }}>{title}</div>
+        <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, color: "#666" }}>Имя</div>
+            <input
+              value={client.firstName}
+              onChange={(e) => setClient((c) => ({ ...c, firstName: e.target.value }))}
+              style={{ height: 40, padding: "0 12px", outline: "none", fontSize: 13 }}
+            />
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, color: "#666" }}>Фамилия</div>
+            <input
+              value={client.lastName}
+              onChange={(e) => setClient((c) => ({ ...c, lastName: e.target.value }))}
+              style={{ height: 40, padding: "0 12px", outline: "none", fontSize: 13 }}
+            />
+          </div>
+        </div>
+
         <div style={{ marginTop: 6, color: "#555", fontSize: 13 }}>
           Воронка: <b>{client.funnelStage.funnel.name}</b> → {client.funnelStage.name}
         </div>
@@ -110,7 +131,7 @@ export default function ClientDetail({
           <div style={{ fontSize: 12, color: "#666" }}>Модель септика</div>
           <select
             value={client.septicModelId ?? client.septicModel?.id ?? ""}
-            onChange={async (e) => {
+            onChange={(e) => {
               const septicModelId = e.target.value || null;
               setClient((c) => ({
                 ...c,
@@ -119,19 +140,6 @@ export default function ClientDetail({
                   ? septicModels.find((m) => m.id === septicModelId) ?? null
                   : null,
               }));
-              setSavingClient(true);
-              try {
-                const res = await fetch("/api/clients/update", {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify({ clientId: client.id, septicModelId }),
-                });
-                if (!res.ok) throw new Error("update failed");
-              } catch {
-                alert("Не удалось сохранить модель септика");
-              } finally {
-                setSavingClient(false);
-              }
             }}
             style={{
               height: 40,
@@ -156,24 +164,6 @@ export default function ClientDetail({
           <input
             value={client.phone ?? ""}
             onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))}
-            onBlur={async () => {
-              setSavingClient(true);
-              try {
-                const res = await fetch("/api/clients/update", {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify({
-                    clientId: client.id,
-                    phone: (client.phone ?? "").trim() || null,
-                  }),
-                });
-                if (!res.ok) throw new Error("update failed");
-              } catch {
-                alert("Не удалось сохранить телефон");
-              } finally {
-                setSavingClient(false);
-              }
-            }}
             placeholder="+7..."
             style={{
               height: 40,
@@ -187,33 +177,11 @@ export default function ClientDetail({
             }}
           />
         </div>
-        <div style={{ marginTop: 10, color: "#555", fontSize: 13 }}>
-          Комментарий: <b>{client.shortComment || "—"}</b>
-        </div>
-
         <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
           <div style={{ fontSize: 12, color: "#666" }}>Комментарий</div>
           <textarea
             value={client.shortComment ?? ""}
             onChange={(e) => setClient((c) => ({ ...c, shortComment: e.target.value }))}
-            onBlur={async () => {
-              setSavingClient(true);
-              try {
-                const res = await fetch("/api/clients/update", {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify({
-                    clientId: client.id,
-                    shortComment: (client.shortComment ?? "").trim() || "",
-                  }),
-                });
-                if (!res.ok) throw new Error("update failed");
-              } catch {
-                alert("Не удалось сохранить комментарий");
-              } finally {
-                setSavingClient(false);
-              }
-            }}
             placeholder="Комментарий..."
             style={{
               minHeight: 70,
@@ -234,22 +202,9 @@ export default function ClientDetail({
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   const next = !client.qualified;
                   setClient((c) => ({ ...c, qualified: next }));
-                  setSavingClient(true);
-                  try {
-                    const res = await fetch("/api/clients/update", {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ clientId: client.id, qualified: next }),
-                    });
-                    if (!res.ok) throw new Error("update failed");
-                  } catch {
-                    alert("Не удалось сохранить квалификацию");
-                  } finally {
-                    setSavingClient(false);
-                  }
                 }}
                 style={{
                   height: 36,
@@ -271,22 +226,9 @@ export default function ClientDetail({
             <div style={{ fontSize: 12, color: "#666" }}>Статус</div>
             <select
               value={client.moneyProgress}
-              onChange={async (e) => {
+              onChange={(e) => {
                 const moneyProgress = e.target.value as ClientDetailModel["moneyProgress"];
                 setClient((c) => ({ ...c, moneyProgress }));
-                setSavingClient(true);
-                try {
-                  const res = await fetch("/api/clients/update", {
-                    method: "POST",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ clientId: client.id, moneyProgress }),
-                  });
-                  if (!res.ok) throw new Error("update failed");
-                } catch {
-                  alert("Не удалось сохранить статус");
-                } finally {
-                  setSavingClient(false);
-                }
               }}
               style={{
                 height: 40,
@@ -309,22 +251,9 @@ export default function ClientDetail({
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   const gsoType: ClientDetailModel["gsoType"] = "GSO1";
                   setClient((c) => ({ ...c, gsoType }));
-                  setSavingClient(true);
-                  try {
-                    const res = await fetch("/api/clients/update", {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ clientId: client.id, gsoType }),
-                    });
-                    if (!res.ok) throw new Error("update failed");
-                  } catch {
-                    alert("Не удалось сохранить ГСО");
-                  } finally {
-                    setSavingClient(false);
-                  }
                 }}
                 style={{
                   height: 36,
@@ -341,22 +270,9 @@ export default function ClientDetail({
               </button>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   const gsoType: ClientDetailModel["gsoType"] = "GSO2";
                   setClient((c) => ({ ...c, gsoType }));
-                  setSavingClient(true);
-                  try {
-                    const res = await fetch("/api/clients/update", {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({ clientId: client.id, gsoType }),
-                    });
-                    if (!res.ok) throw new Error("update failed");
-                  } catch {
-                    alert("Не удалось сохранить ГСО");
-                  } finally {
-                    setSavingClient(false);
-                  }
                 }}
                 style={{
                   height: 36,
@@ -380,23 +296,21 @@ export default function ClientDetail({
           <select
             disabled={!canReassign}
             value={client.assignedManagerId ?? ""}
-            onChange={async (e) => {
+            onChange={(e) => {
               const assignedManagerId = e.target.value || null;
-              setClient((c) => ({ ...c, assignedManagerId }));
-              if (!canReassign) return;
-              await fetch("/api/clients/assign", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ clientId: client.id, assignedManagerId }),
-              }).then(async (r) => {
-                if (!r.ok) throw new Error("assign failed");
-                const json = await r.json();
-                setClient((c) => ({
-                  ...c,
-                  assignedManagerId: json.assignedManagerId,
-                  assignedManager: json.assignedManager,
-                }));
-              });
+              const selectedManager =
+                managers.find((m) => m.id === assignedManagerId) ?? null;
+              setClient((c) => ({
+                ...c,
+                assignedManagerId,
+                assignedManager: selectedManager
+                  ? {
+                      id: selectedManager.id,
+                      firstName: selectedManager.firstName,
+                      lastName: selectedManager.lastName,
+                    }
+                  : null,
+              }));
             }}
             style={{
               height: 40,
@@ -418,6 +332,69 @@ export default function ClientDetail({
               Менеджер не может менять ответственного.
             </div>
           ) : null}
+        </div>
+
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <button
+            type="button"
+            className="ms-primaryBtn"
+            disabled={savingClient}
+            onClick={async () => {
+              setSavingClient(true);
+              try {
+                const res = await fetch("/api/clients/update", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    clientId: client.id,
+                    firstName: client.firstName.trim() || "—",
+                    lastName: client.lastName.trim() || "",
+                    phone: (client.phone ?? "").trim() || null,
+                    septicModelId: client.septicModelId ?? client.septicModel?.id ?? null,
+                    shortComment: client.shortComment ?? "",
+                    qualified: client.qualified,
+                    moneyProgress: client.moneyProgress,
+                    gsoType: client.gsoType,
+                    assignedManagerId: canReassign ? (client.assignedManagerId ?? null) : undefined,
+                  }),
+                });
+                if (!res.ok) throw new Error("update failed");
+                alert("Сохранено");
+              } catch {
+                alert("Не удалось сохранить изменения");
+              } finally {
+                setSavingClient(false);
+              }
+            }}
+            style={{
+              height: 40,
+              padding: "0 14px",
+              borderRadius: 10,
+              border: "none",
+              fontSize: 13,
+              cursor: "pointer",
+              opacity: savingClient ? 0.7 : 1,
+            }}
+          >
+            {savingClient ? "Сохранение..." : "Сохранить"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            style={{
+              height: 40,
+              padding: "0 14px",
+              borderRadius: 10,
+              border: "1px solid #ffd6d6",
+              background: "#fff",
+              color: "#c62828",
+              fontSize: 13,
+              cursor: "pointer",
+              opacity: deletingDeal ? 0.7 : 1,
+            }}
+          >
+            Удалить сделку
+          </button>
         </div>
       </aside>
 
@@ -622,6 +599,74 @@ export default function ClientDetail({
           </div>
         </form>
       </main>
+
+      {showDeleteConfirm ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 60,
+          }}
+        >
+          <div
+            style={{
+              width: "min(460px, calc(100vw - 32px))",
+              background: "#fff",
+              borderRadius: 12,
+              border: "1px solid #eee",
+              padding: 14,
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <div style={{ fontSize: 16, color: "#111" }}>Удалить сделку?</div>
+            <div style={{ fontSize: 13, color: "#666" }}>
+              Сделка и все записи коммуникаций будут удалены. Контакт (имя, фамилия, телефон) останется.
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ height: 36, padding: "0 12px", border: "1px solid #ddd", background: "#fff" }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={deletingDeal}
+                onClick={async () => {
+                  setDeletingDeal(true);
+                  try {
+                    const res = await fetch("/api/clients/delete-deal", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ clientId: client.id }),
+                    });
+                    if (!res.ok) throw new Error("delete failed");
+                    window.location.href = "/clients";
+                  } catch {
+                    alert("Не удалось удалить сделку");
+                    setDeletingDeal(false);
+                    setShowDeleteConfirm(false);
+                  }
+                }}
+                style={{
+                  height: 36,
+                  padding: "0 12px",
+                  border: "none",
+                  background: "#c62828",
+                  color: "#fff",
+                }}
+              >
+                {deletingDeal ? "Удаляем..." : "Удалить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

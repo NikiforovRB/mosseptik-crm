@@ -4,14 +4,19 @@ import { useMemo, useState } from "react";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Plus, Trash2 } from "lucide-react";
 
 type Stage = { id: string; name: string; order: number; headerColor: string; funnelId: string };
 type Funnel = { id: string; name: string; stages: Stage[] };
 
 export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
+  const [baseline, setBaseline] = useState<Funnel[]>(initial);
   const [funnels, setFunnels] = useState<Funnel[]>(initial);
+  const [newFunnelName, setNewFunnelName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveHover, setSaveHover] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const isDirty = JSON.stringify(funnels) !== JSON.stringify(baseline);
 
   const sorted = useMemo(
     () =>
@@ -24,6 +29,189 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <h1 style={{ fontSize: 18, fontWeight: 900, margin: 0 }}>Воронки</h1>
+        <button
+          type="button"
+          disabled={!isDirty || isSaving}
+          onMouseEnter={() => setSaveHover(true)}
+          onMouseLeave={() => setSaveHover(false)}
+          onClick={async () => {
+            if (!isDirty || isSaving) return;
+            setIsSaving(true);
+            try {
+              let next = structuredClone(funnels) as Funnel[];
+              const createdFunnelsById = new Map<string, Funnel>();
+
+              for (const f of next) {
+                if (!f.id.startsWith("tmp-funnel-")) continue;
+                const res = await fetch("/api/admin/funnels", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ name: f.name }),
+                });
+                const json = await res.json().catch(() => null);
+                if (!res.ok) throw new Error(json?.message ?? "Не удалось создать воронку");
+                const created = json.funnel as Funnel;
+                createdFunnelsById.set(created.id, created);
+
+                const oldId = f.id;
+                f.id = created.id;
+                if (f.stages[0]?.id?.startsWith("tmp-stage-") && created.stages[0]) {
+                  f.stages[0].id = created.stages[0].id;
+                  f.stages[0].order = created.stages[0].order;
+                }
+                for (const st of f.stages) st.funnelId = created.id;
+
+                next = next.map((x) => (x.id === oldId ? f : x));
+              }
+
+              const nextIds = new Set(next.map((f) => f.id));
+              for (const old of baseline) {
+                if (!nextIds.has(old.id)) {
+                  const res = await fetch(`/api/admin/funnels/${old.id}`, { method: "DELETE" });
+                  const json = await res.json().catch(() => null);
+                  if (!res.ok) throw new Error(json?.message ?? "Не удалось удалить воронку");
+                }
+              }
+
+              for (const f of next) {
+                const original = baseline.find((x) => x.id === f.id) ?? createdFunnelsById.get(f.id) ?? null;
+
+                for (const st of f.stages) {
+                  if (!st.id.startsWith("tmp-stage-")) continue;
+                  const res = await fetch("/api/admin/funnels/stages", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ funnelId: f.id, name: st.name }),
+                  });
+                  const json = await res.json().catch(() => null);
+                  if (!res.ok) throw new Error(json?.message ?? "Не удалось добавить этап");
+                  const createdStage = json.stage as Stage;
+                  st.id = createdStage.id;
+                  st.order = createdStage.order;
+                  st.funnelId = createdStage.funnelId;
+                }
+
+                const originalStages = original?.stages ?? [];
+                const currentStageIds = new Set(f.stages.map((s) => s.id));
+                for (const os of originalStages) {
+                  if (!currentStageIds.has(os.id)) {
+                    const res = await fetch(`/api/admin/funnels/stages/${os.id}`, { method: "DELETE" });
+                    const json = await res.json().catch(() => null);
+                    if (!res.ok) throw new Error(json?.message ?? "Не удалось удалить этап");
+                  }
+                }
+
+                const originalById = new Map(originalStages.map((s) => [s.id, s]));
+                for (const s of f.stages) {
+                  const prev = originalById.get(s.id);
+                  if (!prev) continue;
+                  if (prev.name !== s.name || prev.headerColor !== s.headerColor) {
+                    const res = await fetch(`/api/admin/funnels/stages/${s.id}`, {
+                      method: "PATCH",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ name: s.name, headerColor: s.headerColor }),
+                    });
+                    const json = await res.json().catch(() => null);
+                    if (!res.ok) throw new Error(json?.message ?? "Не удалось обновить этап");
+                  }
+                }
+
+                const orderedStageIds = f.stages.slice().sort((a, b) => a.order - b.order).map((s) => s.id);
+                if (orderedStageIds.length) {
+                  const res = await fetch("/api/admin/funnels/stages/reorder", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ funnelId: f.id, orderedStageIds }),
+                  });
+                  const json = await res.json().catch(() => null);
+                  if (!res.ok) throw new Error(json?.message ?? "Не удалось сохранить порядок этапов");
+                }
+              }
+
+              const normalized = next.map((f) => ({
+                ...f,
+                stages: f.stages
+                  .slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map((s, i) => ({ ...s, order: i + 1, funnelId: f.id })),
+              }));
+              setFunnels(normalized);
+              setBaseline(normalized);
+              setNewFunnelName("");
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Не удалось сохранить изменения";
+              alert(msg);
+            } finally {
+              setIsSaving(false);
+            }
+          }}
+          style={{
+            height: 36,
+            padding: "0 14px",
+            borderRadius: 8,
+            border: "none",
+            color: "#fff",
+            fontSize: 13,
+            cursor: isDirty && !isSaving ? "pointer" : "default",
+            background:
+              isDirty && !isSaving ? (saveHover ? "#337fe8" : "#0f68e4") : "#aeafb1",
+          }}
+        >
+          {isSaving ? "Сохранение..." : "Сохранить"}
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "#fff",
+          border: "1px solid #eee",
+          borderRadius: 12,
+          padding: 10,
+        }}
+      >
+        <input
+          placeholder="Название новой воронки"
+          value={newFunnelName}
+          onChange={(e) => setNewFunnelName(e.target.value)}
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          type="button"
+          title="Добавить воронку"
+          onClick={() => {
+            const name = newFunnelName.trim();
+            if (!name) return;
+            const tempFunnelId = `tmp-funnel-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const tempStageId = `tmp-stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            setFunnels((prev) => [
+              ...prev,
+              {
+                id: tempFunnelId,
+                name,
+                stages: [
+                  {
+                    id: tempStageId,
+                    funnelId: tempFunnelId,
+                    name: "Новая",
+                    order: 1,
+                    headerColor: "#ccd0e1",
+                  },
+                ],
+              },
+            ]);
+            setNewFunnelName("");
+          }}
+          style={iconBtn}
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+
       {sorted.map((funnel) => (
         <div
           key={funnel.id}
@@ -34,13 +222,66 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
             overflow: "hidden",
           }}
         >
-          <div style={{ padding: 12, fontWeight: 900, borderBottom: "1px solid #eee" }}>
-            {funnel.name}
+          <div
+            style={{
+              padding: 12,
+              borderBottom: "1px solid #eee",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+          >
+            <span style={{ fontWeight: 900 }}>{funnel.name}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                title="Добавить этап"
+                onClick={() => {
+                  const stageName = prompt("Название нового этапа", "Новый этап")?.trim();
+                  if (!stageName) return;
+                  const tempStageId = `tmp-stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                  setFunnels((prev) =>
+                    prev.map((f) =>
+                      f.id === funnel.id
+                        ? {
+                            ...f,
+                            stages: [
+                              ...f.stages,
+                              {
+                                id: tempStageId,
+                                funnelId: f.id,
+                                name: stageName,
+                                order: f.stages.length + 1,
+                                headerColor: "#ccd0e1",
+                              },
+                            ],
+                          }
+                        : f
+                    )
+                  );
+                }}
+                style={iconBtn}
+              >
+                <Plus size={16} />
+              </button>
+              <button
+                type="button"
+                title="Удалить воронку"
+                onClick={() => {
+                  if (!confirm(`Удалить воронку "${funnel.name}"?`)) return;
+                  setFunnels((prev) => prev.filter((f) => f.id !== funnel.id));
+                }}
+                style={iconBtn}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
-            onDragEnd={async (e) => {
+            onDragEnd={(e) => {
               const activeId = String(e.active.id);
               const overId = e.over?.id ? String(e.over.id) : null;
               if (!overId || activeId === overId) return;
@@ -57,22 +298,6 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
                 }));
                 return next;
               });
-
-              const orderedStageIds = (() => {
-                const ff = funnels.find((x) => x.id === funnel.id);
-                if (!ff) return [];
-                const copy = ff.stages.slice();
-                const oldIndex = copy.findIndex((s) => s.id === activeId);
-                const newIndex = copy.findIndex((s) => s.id === overId);
-                const moved = arrayMove(copy, oldIndex, newIndex);
-                return moved.map((s) => s.id);
-              })();
-
-              await fetch("/api/admin/funnels/stages/reorder", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ funnelId: funnel.id, orderedStageIds }),
-              }).catch(() => {});
             }}
           >
             <SortableContext
@@ -84,7 +309,7 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
                   <StageRow
                     key={s.id}
                     stage={s}
-                    onChange={async (patch) => {
+                    onChange={(patch) => {
                       setFunnels((prev) =>
                         prev.map((ff) =>
                           ff.id !== funnel.id
@@ -95,11 +320,22 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
                               }
                         )
                       );
-                      await fetch(`/api/admin/funnels/stages/${s.id}`, {
-                        method: "PATCH",
-                        headers: { "content-type": "application/json" },
-                        body: JSON.stringify(patch),
-                      }).catch(() => {});
+                    }}
+                    onDelete={() => {
+                      if (!confirm(`Удалить этап "${s.name}"?`)) return;
+                      setFunnels((prev) =>
+                        prev.map((ff) =>
+                          ff.id !== funnel.id
+                            ? ff
+                            : {
+                                ...ff,
+                                stages: ff.stages
+                                  .filter((x) => x.id !== s.id)
+                                  .sort((a, b) => a.order - b.order)
+                                  .map((x, i) => ({ ...x, order: i + 1 })),
+                              }
+                        )
+                      );
                     }}
                   />
                 ))}
@@ -115,9 +351,11 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
 function StageRow({
   stage,
   onChange,
+  onDelete,
 }: {
   stage: Stage;
   onChange: (patch: Partial<Pick<Stage, "name" | "headerColor">>) => void;
+  onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: stage.id,
@@ -134,32 +372,13 @@ function StageRow({
         transition,
         opacity: isDragging ? 0.65 : 1,
         display: "grid",
-        gridTemplateColumns: "auto 1fr auto",
+        gridTemplateColumns: "1fr auto auto",
         gap: 10,
         padding: 12,
         borderTop: "1px solid #eee",
         alignItems: "center",
       }}
     >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          border: "1px solid #ededed",
-          background: "#fff",
-          display: "grid",
-          placeItems: "center",
-          cursor: "grab",
-        }}
-        title="Перетащить"
-      >
-        <GripVertical size={18} />
-      </button>
-
       <input
         value={stage.name}
         onChange={(e) => onChange({ name: e.target.value })}
@@ -210,8 +429,55 @@ function StageRow({
             background: isValid ? hex.trim() : stage.headerColor,
           }}
         />
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: "1px solid #dcdfe6",
+            background: "#fff",
+            display: "grid",
+            placeItems: "center",
+            cursor: "grab",
+          }}
+          title="Перетащить"
+        >
+          <GripVertical size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          style={{ ...iconBtn, color: "#b42318" }}
+          title="Удалить этап"
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
     </div>
   );
 }
+
+const iconBtn: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 8,
+  border: "1px solid #dcdfe6",
+  background: "#fff",
+  display: "grid",
+  placeItems: "center",
+  cursor: "pointer",
+  color: "#111",
+};
+
+const inputStyle: React.CSSProperties = {
+  height: 38,
+  borderRadius: 8,
+  border: "1px solid #dcdfe6",
+  padding: "0 10px",
+  outline: "none",
+  fontSize: 13,
+};
 

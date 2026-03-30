@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { fileToWebpBlob } from "@/lib/image";
 import { presignUpload, putObject } from "@/lib/upload";
 
@@ -24,8 +24,6 @@ export default function UsersAdmin({ initial }: { initial: UserRow[] }) {
     role: "MANAGER" as UserRow["role"],
   });
 
-  const byId = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
-
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div
@@ -39,7 +37,7 @@ export default function UsersAdmin({ initial }: { initial: UserRow[] }) {
         }}
       >
         <div style={{ fontWeight: 900 }}>Добавить пользователя</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 180px auto", gap: 10 }}>
           <input
             placeholder="Логин"
             value={draft.username}
@@ -105,8 +103,11 @@ export default function UsersAdmin({ initial }: { initial: UserRow[] }) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#fafafa" }}>
+              <th style={th}>Фото</th>
               <th style={th}>Логин</th>
               <th style={th}>Имя</th>
+              <th style={th}>Фамилия</th>
+              <th style={th}>Пароль</th>
               <th style={th}>Роль</th>
               <th style={th} />
             </tr>
@@ -155,91 +156,93 @@ function UserRowItem({
 
   return (
     <tr style={{ borderTop: "1px solid #eee" }}>
-      <td style={td}>{user.username}</td>
       <td style={td}>
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              title="Аватар"
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 999,
-                border: "1px solid #ededed",
-                background: "#fafafa",
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            title="Аватар"
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 999,
+              border: "1px solid #ededed",
+              background: "#fafafa",
+            }}
+          />
+          <label style={{ fontSize: 12, color: "#666", cursor: "pointer", whiteSpace: "nowrap" }}>
+            {uploading ? "Загрузка..." : "Сменить"}
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              disabled={uploading}
+              onChange={async (e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                if (!file) return;
+                setUploading(true);
+                try {
+                  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+                  const originalPresign = await presignUpload({
+                    purpose: "avatar",
+                    variant: "original",
+                    contentType: file.type || "application/octet-stream",
+                    ext,
+                  });
+                  const webpBlob = await fileToWebpBlob(file, { maxSize: 320, quality: 0.86 });
+                  const webpPresign = await presignUpload({
+                    purpose: "avatar",
+                    variant: "webp",
+                    contentType: "image/webp",
+                    ext: "webp",
+                  });
+
+                  await putObject(originalPresign.uploadUrl, file);
+                  await putObject(webpPresign.uploadUrl, webpBlob);
+
+                  const res = await fetch(`/api/admin/users/${user.id}/avatar`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({
+                      avatarOriginalKey: originalPresign.key,
+                      avatarWebpKey: webpPresign.key,
+                    }),
+                  });
+                  if (!res.ok) throw new Error("avatar update failed");
+                  const json = await res.json();
+                  onChange(json.user);
+                } catch {
+                  alert("Не удалось обновить фото");
+                } finally {
+                  setUploading(false);
+                }
               }}
             />
-            <label style={{ fontSize: 12, color: "#666", cursor: "pointer" }}>
-              {uploading ? "Загрузка..." : "Сменить фото"}
-              <input
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                disabled={uploading}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  e.target.value = "";
-                  if (!file) return;
-                  setUploading(true);
-                  try {
-                    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-                    const originalPresign = await presignUpload({
-                      purpose: "avatar",
-                      variant: "original",
-                      contentType: file.type || "application/octet-stream",
-                      ext,
-                    });
-                    const webpBlob = await fileToWebpBlob(file, { maxSize: 320, quality: 0.86 });
-                    const webpPresign = await presignUpload({
-                      purpose: "avatar",
-                      variant: "webp",
-                      contentType: "image/webp",
-                      ext: "webp",
-                    });
-
-                    await putObject(originalPresign.uploadUrl, file);
-                    await putObject(webpPresign.uploadUrl, webpBlob);
-
-                    const res = await fetch(`/api/admin/users/${user.id}/avatar`, {
-                      method: "POST",
-                      headers: { "content-type": "application/json" },
-                      body: JSON.stringify({
-                        avatarOriginalKey: originalPresign.key,
-                        avatarWebpKey: webpPresign.key,
-                      }),
-                    });
-                    if (!res.ok) throw new Error("avatar update failed");
-                    const json = await res.json();
-                    onChange(json.user);
-                  } catch {
-                    alert("Не удалось обновить фото");
-                  } finally {
-                    setUploading(false);
-                  }
-                }}
-              />
-            </label>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <input
-              value={edit.firstName}
-              onChange={(e) => setEdit((x) => ({ ...x, firstName: e.target.value }))}
-              style={input}
-            />
-            <input
-              value={edit.lastName}
-              onChange={(e) => setEdit((x) => ({ ...x, lastName: e.target.value }))}
-              style={input}
-            />
-          </div>
-          <input
-            placeholder="Новый пароль (опционально)"
-            type="password"
-            value={edit.password}
-            onChange={(e) => setEdit((x) => ({ ...x, password: e.target.value }))}
-            style={input}
-          />
+          </label>
         </div>
+      </td>
+      <td style={td}>{user.username}</td>
+      <td style={td}>
+        <input
+          value={edit.firstName}
+          onChange={(e) => setEdit((x) => ({ ...x, firstName: e.target.value }))}
+          style={input}
+        />
+      </td>
+      <td style={td}>
+        <input
+          value={edit.lastName}
+          onChange={(e) => setEdit((x) => ({ ...x, lastName: e.target.value }))}
+          style={input}
+        />
+      </td>
+      <td style={td}>
+        <input
+          placeholder="Новый пароль"
+          type="password"
+          value={edit.password}
+          onChange={(e) => setEdit((x) => ({ ...x, password: e.target.value }))}
+          style={input}
+        />
       </td>
       <td style={td}>
         <select
@@ -297,7 +300,7 @@ const th: React.CSSProperties = {
   fontWeight: 900,
 };
 
-const td: React.CSSProperties = { padding: 12, verticalAlign: "top" };
+const td: React.CSSProperties = { padding: 8, verticalAlign: "middle" };
 
 const input: React.CSSProperties = {
   height: 38,
