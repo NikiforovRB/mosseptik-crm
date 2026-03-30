@@ -118,7 +118,8 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
                   }
                 }
 
-                const orderedStageIds = f.stages.slice().sort((a, b) => a.order - b.order).map((s) => s.id);
+                // Persist exactly the visual order from current draft state.
+                const orderedStageIds = f.stages.map((s) => s.id);
                 if (orderedStageIds.length) {
                   const res = await fetch("/api/admin/funnels/stages/reorder", {
                     method: "POST",
@@ -132,10 +133,7 @@ export default function FunnelsAdmin({ initial }: { initial: Funnel[] }) {
 
               const normalized = next.map((f) => ({
                 ...f,
-                stages: f.stages
-                  .slice()
-                  .sort((a, b) => a.order - b.order)
-                  .map((s, i) => ({ ...s, order: i + 1, funnelId: f.id })),
+                stages: f.stages.map((s, i) => ({ ...s, order: i + 1, funnelId: f.id })),
               }));
               setFunnels(normalized);
               setBaseline(normalized);
@@ -363,6 +361,7 @@ function StageRow({
 
   const [hex, setHex] = useState(stage.headerColor);
   const isValid = /^#[0-9a-fA-F]{6}$/.test(hex.trim());
+  const safeColor = isValid ? hex.trim() : "#ccd0e1";
 
   return (
     <div
@@ -419,16 +418,33 @@ function StageRow({
           }}
           title="Цвет шапки этапа (#RRGGBB)"
         />
-        <div
-          title="Предпросмотр"
+        <input
+          type="color"
+          value={safeColor}
+          onChange={(e) => {
+            const v = e.target.value;
+            setHex(v);
+            onChange({ headerColor: v });
+          }}
+          title="Выбрать цвет"
           style={{
             width: 40,
             height: 34,
             borderRadius: 10,
             border: "1px solid #ededed",
-            background: isValid ? hex.trim() : stage.headerColor,
+            background: safeColor,
+            padding: 0,
+            cursor: "pointer",
           }}
         />
+        <button
+          type="button"
+          onClick={onDelete}
+          style={{ ...iconBtn, color: "#b42318" }}
+          title="Удалить этап"
+        >
+          <Trash2 size={16} />
+        </button>
         <button
           type="button"
           {...attributes}
@@ -437,8 +453,8 @@ function StageRow({
             width: 34,
             height: 34,
             borderRadius: 8,
-            border: "1px solid #dcdfe6",
-            background: "#fff",
+            border: "none",
+            background: "transparent",
             display: "grid",
             placeItems: "center",
             cursor: "grab",
@@ -446,14 +462,6 @@ function StageRow({
           title="Перетащить"
         >
           <GripVertical size={16} />
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          style={{ ...iconBtn, color: "#b42318" }}
-          title="Удалить этап"
-        >
-          <Trash2 size={16} />
         </button>
       </div>
     </div>

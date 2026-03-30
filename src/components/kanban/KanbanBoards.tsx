@@ -8,6 +8,7 @@ import {
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
@@ -134,7 +135,11 @@ export default function KanbanBoards({ initial }: { initial: KanbanFunnel[] }) {
         <section key={f.id} style={{ display: "grid", gap: 10, minWidth: "max-content" }}>
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={(args) => {
+              const pointer = pointerWithin(args);
+              if (pointer.length) return pointer;
+              return closestCorners(args);
+            }}
             onDragStart={(e: DragStartEvent) => {
               const parsed = e.active?.id ? parseId(String(e.active.id)) : null;
               if (parsed?.type === "card") setActiveCardId(parsed.id);
