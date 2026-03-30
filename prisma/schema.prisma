@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String          @id @default(cuid())
+  username          String          @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  role              UserRole        @default(MANAGER)
+  avatarOriginalKey String?
+  avatarWebpKey     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  assignedClients   Client[]        @relation("ClientAssignee")
+  communications    Communication[] @relation("CommunicationAuthor")
+}
+
+model Funnel {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  stages    FunnelStage[]
+}
+
+model FunnelStage {
+  id          String   @id @default(cuid())
+  funnelId    String
+  name        String
+  order       Int
+  headerColor String   @default("#ccd0e1")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clients     Client[]
+  funnel      Funnel   @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+
+  @@unique([funnelId, order])
+  @@index([funnelId])
+}
+
+model SepticModel {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  clients   Client[]
+}
+
+model Client {
+  id                  String          @id @default(cuid())
+  firstName           String
+  lastName            String
+  phone               String?
+  shortComment        String          @default("")
+  septicModelId       String?
+  funnelStageId       String
+  orderInStage        Int             @default(0)
+  assignedManagerId   String?
+  qualified           Boolean         @default(false)
+  moneyProgress       MoneyProgress   @default(ASSIGNED)
+  gsoType             GsoType         @default(GSO1)
+  isUrgent            Boolean         @default(false)
+  lastCommunicationAt DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  assignedManager     User?           @relation("ClientAssignee", fields: [assignedManagerId], references: [id])
+  funnelStage         FunnelStage     @relation(fields: [funnelStageId], references: [id])
+  septicModel         SepticModel?    @relation(fields: [septicModelId], references: [id])
+  communications      Communication[]
+
+  @@index([funnelStageId, orderInStage])
+  @@index([assignedManagerId])
+}
+
+model Communication {
+  id                String               @id @default(cuid())
+  clientId          String
+  authorId          String
+  text              String               @default("")
+  createdAt         DateTime             @default(now())
+  communicationDate DateTime
+  author            User                 @relation("CommunicationAuthor", fields: [authorId], references: [id])
+  client            Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  photos            CommunicationPhoto[]
+
+  @@index([clientId, createdAt])
+}
+
+model CommunicationPhoto {
+  id              String        @id @default(cuid())
+  communicationId String
+  originalKey     String
+  webpKey         String
+  createdAt       DateTime      @default(now())
+  communication   Communication @relation(fields: [communicationId], references: [id], onDelete: Cascade)
+
+  @@index([communicationId])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+}
+
+enum MoneyProgress {
+  ASSIGNED
+  CONFIRMED
+  DONE_WITH_MONEY
+  DONE_WITHOUT_MONEY
+}
+
+enum GsoType {
+  GSO1
+  GSO2
+}
