@@ -1,6 +1,8 @@
 :root {
   --background: #f1f1f1;
   --foreground: #111111;
+  --controlRadius: 8px;
+  --fieldBg: #f4f6fb;
 }
 
 @font-face {
@@ -70,6 +72,30 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button {
+  border-radius: var(--controlRadius) !important;
+}
+
+input,
+textarea,
+select {
+  border-radius: var(--controlRadius) !important;
+  background: var(--fieldBg) !important;
+  border: none !important;
+}
+
+.ms-primaryBtn {
+  background: #0f68e4 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ms-primaryBtn:hover {
+    background: #337fe8 !important;
+  }
 }
 
 a {

@@ -45,12 +45,23 @@ export default async function ClientPage({
     select: { id: true, firstName: true, lastName: true, role: true },
   });
 
+  const septicModels = await prisma.septicModel.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+
+  const funnelName = client.funnelStage.funnel.name.toLowerCase();
+  const section = funnelName.includes("сервис") ? "service" : "montazh";
+  const backHref = `/?section=${section}`;
+
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa" }}>
       <AppHeader />
       <ClientDetail
         client={client as any}
         users={users as any}
+        septicModels={septicModels as any}
+        backHref={backHref}
         canReassign={user.role === "ADMIN"}
       />
     </div>

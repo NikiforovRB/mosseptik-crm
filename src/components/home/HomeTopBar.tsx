@@ -20,6 +20,7 @@ export default function HomeTopBar({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
+        background: "transparent",
       }}
     >
       <button

@@ -88,10 +88,17 @@ export default async function Home({
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", background: "#f1f1f1" }}>
       <AppHeader />
-      <HomeTopBar selectedSection={selectedSection} />
-      <KanbanBoards initial={filtered as unknown as KanbanFunnel[]} />
+      <div
+        style={{
+          background: "#e5e8ed",
+          minHeight: "calc(100vh - 64px)",
+        }}
+      >
+        <HomeTopBar selectedSection={selectedSection} />
+        <KanbanBoards initial={filtered as unknown as KanbanFunnel[]} />
+      </div>
     </div>
   );
 }

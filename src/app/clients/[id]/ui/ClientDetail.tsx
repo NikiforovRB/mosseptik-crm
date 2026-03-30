@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { formatRuDayMonthWeekday } from "@/lib/date";
 import CalendarPopover from "@/components/CalendarPopover";
 import { fileToWebpBlob } from "@/lib/image";
@@ -8,6 +9,7 @@ import { presignUpload, putObject } from "@/lib/upload";
 import AttachmentThumb from "@/components/AttachmentThumb";
 
 type UserLite = { id: string; firstName: string; lastName: string; role: string };
+type SepticModelLite = { id: string; name: string };
 type ClientDetailModel = {
   id: string;
   firstName: string;
@@ -15,11 +17,12 @@ type ClientDetailModel = {
   phone?: string | null;
   shortComment: string;
   septicModel: { id: string; name: string } | null;
+  septicModelId?: string | null;
   assignedManagerId: string | null;
   assignedManager: { id: string; firstName: string; lastName: string } | null;
   qualified: boolean;
-  moneyProgress: string;
-  gsoType: string;
+  moneyProgress: "ASSIGNED" | "CONFIRMED" | "DONE_WITH_MONEY" | "DONE_WITHOUT_MONEY";
+  gsoType: "GSO1" | "GSO2";
   isUrgent: boolean;
   funnelStage: { id: string; name: string; funnel: { name: string } };
   communications: Array<{
@@ -35,10 +38,14 @@ type ClientDetailModel = {
 export default function ClientDetail({
   client: initialClient,
   users,
+  septicModels,
+  backHref,
   canReassign,
 }: {
   client: ClientDetailModel;
   users: UserLite[];
+  septicModels: SepticModelLite[];
+  backHref: string;
   canReassign: boolean;
 }) {
   const [client, setClient] = useState<ClientDetailModel>(initialClient);
@@ -46,6 +53,7 @@ export default function ClientDetail({
   const [date, setDate] = useState<Date>(() => new Date());
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
+  const [savingClient, setSavingClient] = useState(false);
 
   const title = `${client.firstName} ${client.lastName}`.trim();
 
@@ -76,18 +84,295 @@ export default function ClientDetail({
           overflow: "auto",
         }}
       >
-        <div style={{ fontWeight: 900, fontSize: 16 }}>{title}</div>
+        <Link
+          href={backHref}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            height: 34,
+            padding: "0 10px",
+            borderRadius: 12,
+            border: "1px solid #ededed",
+            background: "#fff",
+            color: "#111",
+            fontSize: 13,
+          }}
+        >
+          ← Назад
+        </Link>
+
+        <div style={{ marginTop: 12, fontSize: 16 }}>{title}</div>
         <div style={{ marginTop: 6, color: "#555", fontSize: 13 }}>
           Воронка: <b>{client.funnelStage.funnel.name}</b> → {client.funnelStage.name}
         </div>
-        <div style={{ marginTop: 10, color: "#555", fontSize: 13 }}>
-          Модель септика: <b>{client.septicModel?.name ?? "—"}</b>
+        <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "#666" }}>Модель септика</div>
+          <select
+            value={client.septicModelId ?? client.septicModel?.id ?? ""}
+            onChange={async (e) => {
+              const septicModelId = e.target.value || null;
+              setClient((c) => ({
+                ...c,
+                septicModelId,
+                septicModel: septicModelId
+                  ? septicModels.find((m) => m.id === septicModelId) ?? null
+                  : null,
+              }));
+              setSavingClient(true);
+              try {
+                const res = await fetch("/api/clients/update", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ clientId: client.id, septicModelId }),
+                });
+                if (!res.ok) throw new Error("update failed");
+              } catch {
+                alert("Не удалось сохранить модель септика");
+              } finally {
+                setSavingClient(false);
+              }
+            }}
+            style={{
+              height: 40,
+              borderRadius: 12,
+              border: "1px solid #ededed",
+              padding: "0 10px",
+              background: "#fff",
+              opacity: savingClient ? 0.7 : 1,
+            }}
+          >
+            <option value="">—</option>
+            {septicModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
         </div>
-        <div style={{ marginTop: 10, color: "#555", fontSize: 13 }}>
-          Телефон: <b>{client.phone ?? "—"}</b>
+
+        <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "#666" }}>Телефон</div>
+          <input
+            value={client.phone ?? ""}
+            onChange={(e) => setClient((c) => ({ ...c, phone: e.target.value }))}
+            onBlur={async () => {
+              setSavingClient(true);
+              try {
+                const res = await fetch("/api/clients/update", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    clientId: client.id,
+                    phone: (client.phone ?? "").trim() || null,
+                  }),
+                });
+                if (!res.ok) throw new Error("update failed");
+              } catch {
+                alert("Не удалось сохранить телефон");
+              } finally {
+                setSavingClient(false);
+              }
+            }}
+            placeholder="+7..."
+            style={{
+              height: 40,
+              borderRadius: 12,
+              border: "1px solid #ededed",
+              padding: "0 12px",
+              outline: "none",
+              fontSize: 13,
+              background: "#fff",
+              opacity: savingClient ? 0.7 : 1,
+            }}
+          />
         </div>
         <div style={{ marginTop: 10, color: "#555", fontSize: 13 }}>
           Комментарий: <b>{client.shortComment || "—"}</b>
+        </div>
+
+        <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "#666" }}>Комментарий</div>
+          <textarea
+            value={client.shortComment ?? ""}
+            onChange={(e) => setClient((c) => ({ ...c, shortComment: e.target.value }))}
+            onBlur={async () => {
+              setSavingClient(true);
+              try {
+                const res = await fetch("/api/clients/update", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    clientId: client.id,
+                    shortComment: (client.shortComment ?? "").trim() || "",
+                  }),
+                });
+                if (!res.ok) throw new Error("update failed");
+              } catch {
+                alert("Не удалось сохранить комментарий");
+              } finally {
+                setSavingClient(false);
+              }
+            }}
+            placeholder="Комментарий..."
+            style={{
+              minHeight: 70,
+              resize: "none",
+              padding: 12,
+              outline: "none",
+              fontSize: 13,
+              opacity: savingClient ? 0.7 : 1,
+            }}
+          />
+        </div>
+
+        <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12, color: "#666" }}>Иконки статусов</div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, color: "#666" }}>Квалификация</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const next = !client.qualified;
+                  setClient((c) => ({ ...c, qualified: next }));
+                  setSavingClient(true);
+                  try {
+                    const res = await fetch("/api/clients/update", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ clientId: client.id, qualified: next }),
+                    });
+                    if (!res.ok) throw new Error("update failed");
+                  } catch {
+                    alert("Не удалось сохранить квалификацию");
+                  } finally {
+                    setSavingClient(false);
+                  }
+                }}
+                style={{
+                  height: 36,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ededed",
+                  background: "#fff",
+                  color: "#111",
+                  cursor: "pointer",
+                  opacity: savingClient ? 0.7 : 1,
+                }}
+              >
+                {client.qualified ? "Квалифицирован" : "Не квалифицирован"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, color: "#666" }}>Статус</div>
+            <select
+              value={client.moneyProgress}
+              onChange={async (e) => {
+                const moneyProgress = e.target.value as ClientDetailModel["moneyProgress"];
+                setClient((c) => ({ ...c, moneyProgress }));
+                setSavingClient(true);
+                try {
+                  const res = await fetch("/api/clients/update", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ clientId: client.id, moneyProgress }),
+                  });
+                  if (!res.ok) throw new Error("update failed");
+                } catch {
+                  alert("Не удалось сохранить статус");
+                } finally {
+                  setSavingClient(false);
+                }
+              }}
+              style={{
+                height: 40,
+                borderRadius: 8,
+                border: "1px solid #ededed",
+                padding: "0 10px",
+                background: "#fff",
+                opacity: savingClient ? 0.7 : 1,
+              }}
+            >
+              <option value="ASSIGNED">Назначен</option>
+              <option value="CONFIRMED">Подтверждён</option>
+              <option value="DONE_WITH_MONEY">Состоялся с деньгами</option>
+              <option value="DONE_WITHOUT_MONEY">Состоялся без денег</option>
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 12, color: "#666" }}>ГСО</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const gsoType: ClientDetailModel["gsoType"] = "GSO1";
+                  setClient((c) => ({ ...c, gsoType }));
+                  setSavingClient(true);
+                  try {
+                    const res = await fetch("/api/clients/update", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ clientId: client.id, gsoType }),
+                    });
+                    if (!res.ok) throw new Error("update failed");
+                  } catch {
+                    alert("Не удалось сохранить ГСО");
+                  } finally {
+                    setSavingClient(false);
+                  }
+                }}
+                style={{
+                  height: 36,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ededed",
+                  background: client.gsoType === "GSO1" ? "#f3f6ff" : "#fff",
+                  color: "#111",
+                  cursor: "pointer",
+                  opacity: savingClient ? 0.7 : 1,
+                }}
+              >
+                ГСО 1
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const gsoType: ClientDetailModel["gsoType"] = "GSO2";
+                  setClient((c) => ({ ...c, gsoType }));
+                  setSavingClient(true);
+                  try {
+                    const res = await fetch("/api/clients/update", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ clientId: client.id, gsoType }),
+                    });
+                    if (!res.ok) throw new Error("update failed");
+                  } catch {
+                    alert("Не удалось сохранить ГСО");
+                  } finally {
+                    setSavingClient(false);
+                  }
+                }}
+                style={{
+                  height: 36,
+                  padding: "0 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ededed",
+                  background: client.gsoType === "GSO2" ? "#f3f6ff" : "#fff",
+                  color: "#111",
+                  cursor: "pointer",
+                  opacity: savingClient ? 0.7 : 1,
+                }}
+              >
+                ГСО 2
+              </button>
+            </div>
+          </div>
         </div>
 
         <div style={{ marginTop: 14, display: "grid", gap: 6 }}>
@@ -318,6 +603,7 @@ export default function ClientDetail({
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="submit"
+              className="ms-primaryBtn"
               disabled={saving}
               style={{
                 height: 40,

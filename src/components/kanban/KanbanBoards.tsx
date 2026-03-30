@@ -121,14 +121,7 @@ export default function KanbanBoards({ initial }: { initial: KanbanFunnel[] }) {
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: 18,
-        padding: 16,
-        background: "#e5e8ed",
-      }}
-    >
+    <div style={{ display: "grid", gap: 18, padding: 16 }}>
       {funnels.map((f) => (
         <section key={f.id} style={{ display: "grid", gap: 10 }}>
           <div style={{ fontWeight: 900, fontSize: 16, color: "#000000" }}>

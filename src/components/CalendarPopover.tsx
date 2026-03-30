@@ -46,7 +46,7 @@ export default function CalendarPopover({
         <div
           style={{
             position: "absolute",
-            top: 44,
+            bottom: 44,
             left: 0,
             zIndex: 20,
             background: "#fff",

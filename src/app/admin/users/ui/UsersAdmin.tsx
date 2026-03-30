@@ -75,6 +75,7 @@ export default function UsersAdmin({ initial }: { initial: UserRow[] }) {
           </select>
           <button
             type="button"
+            className="ms-primaryBtn"
             style={primaryBtn}
             onClick={async () => {
               const res = await fetch("/api/admin/users", {
