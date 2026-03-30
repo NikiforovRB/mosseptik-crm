@@ -20,29 +20,66 @@ export default async function Home({
   const selectedSection =
     section === "service" || section === "montazh" ? section : "montazh";
 
-  const funnels = await prisma.funnel.findMany({
-    orderBy: { name: "asc" },
-    include: {
-      stages: {
-        orderBy: { order: "asc" },
-        include: {
-          clients: {
-            where:
-              user.role === "ADMIN"
-                ? {}
-                : { assignedManagerId: user.id },
-            orderBy: { orderInStage: "asc" },
-            include: {
-              septicModel: { select: { id: true, name: true } },
-              assignedManager: {
-                select: { id: true, firstName: true, lastName: true },
+  let funnels: any[] = [];
+  try {
+    // IMPORTANT: explicit client select (avoid selecting missing columns during partial migrations)
+    funnels = await prisma.funnel.findMany({
+      orderBy: { name: "asc" },
+      include: {
+        stages: {
+          orderBy: { order: "asc" },
+          include: {
+            clients: {
+              where:
+                user.role === "ADMIN"
+                  ? {}
+                  : { assignedManagerId: user.id },
+              orderBy: { orderInStage: "asc" },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                shortComment: true,
+                qualified: true,
+                moneyProgress: true,
+                gsoType: true,
+                isUrgent: true,
+                lastCommunicationAt: true,
+                funnelStageId: true,
+                orderInStage: true,
+                assignedManagerId: true,
+                septicModel: { select: { id: true, name: true } },
+                assignedManager: {
+                  select: { id: true, firstName: true, lastName: true },
+                },
               },
             },
           },
         },
       },
-    },
-  });
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "DB error";
+    return (
+      <div style={{ minHeight: "100vh", background: "#f1f1f1" }}>
+        <AppHeader />
+        <div style={{ padding: 16 }}>
+          <div style={{ fontSize: 14, color: "#111" }}>
+            Не удаётся загрузить данные из БД.
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: "#666" }}>
+            Проверьте доступ к PostgreSQL и примените SQL миграции (например, добавление
+            колонки phone). Ошибка: {msg}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 12 }}>
+            <a href="/api/health/db" style={{ textDecoration: "underline" }}>
+              /api/health/db
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const filtered = funnels.filter((f) => {
     const n = f.name.toLowerCase();
