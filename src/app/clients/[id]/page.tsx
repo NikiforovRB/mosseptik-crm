@@ -23,7 +23,18 @@ export default async function ClientPage({
       // phone included by default
       assignedManager: { select: { id: true, firstName: true, lastName: true } },
       funnelStage: {
-        select: { id: true, name: true, funnelId: true, funnel: { select: { name: true } } },
+        select: {
+          id: true,
+          name: true,
+          funnelId: true,
+          headerColor: true,
+          funnel: { select: { name: true } },
+        },
+      },
+      nextTask: {
+        include: {
+          assignee: { select: { id: true, firstName: true, lastName: true } },
+        },
       },
       communications: {
         orderBy: { createdAt: "asc" },
@@ -53,19 +64,53 @@ export default async function ClientPage({
     select: { id: true, name: true },
   });
 
-  const funnelName = client.funnelStage.funnel.name.toLowerCase();
-  const section = funnelName.includes("сервис") ? "service" : "montazh";
-  const backHref = `/?section=${section}`;
+  const funnelStageOptions = await prisma.funnelStage.findMany({
+    select: {
+      id: true,
+      name: true,
+      headerColor: true,
+      funnel: { select: { name: true } },
+    },
+    orderBy: [{ funnel: { name: "asc" } }, { order: "asc" }],
+  });
+
+  const clientPlain = {
+    ...client,
+    nextTask: client.nextTask
+      ? {
+          id: client.nextTask.id,
+          dueAt: client.nextTask.dueAt ? client.nextTask.dueAt.toISOString() : null,
+          dueHasTime: client.nextTask.dueHasTime,
+          assigneeId: client.nextTask.assigneeId,
+          assignee: client.nextTask.assignee,
+        }
+      : null,
+    communications: client.communications.map((m) => ({
+      ...m,
+      createdAt: m.createdAt.toISOString(),
+      communicationDate: m.communicationDate.toISOString(),
+      photos: m.photos.map((p) => ({
+        ...p,
+        createdAt: p.createdAt.toISOString(),
+      })),
+    })),
+  };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", background: "#fff" }}>
       <AppHeader />
       <ClientDetail
-        client={client as any}
+        client={clientPlain as any}
         users={users as any}
         septicModels={septicModels as any}
-        backHref={backHref}
+        funnelStageOptions={funnelStageOptions.map((s) => ({
+          id: s.id,
+          name: s.name,
+          headerColor: s.headerColor || "#ccd0e1",
+          funnelName: s.funnel.name,
+        }))}
         canReassign={user.role === "ADMIN"}
+        currentUserId={user.id}
       />
     </div>
   );

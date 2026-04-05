@@ -56,6 +56,7 @@ export async function POST(req: Request) {
       data: {
         clientId,
         authorId: userId,
+        kind: "STANDARD",
         text,
         communicationDate: commDate,
         photos: {

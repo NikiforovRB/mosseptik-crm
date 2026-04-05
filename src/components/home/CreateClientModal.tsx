@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Assignee = { id: string; firstName: string; lastName: string; role: "ADMIN" | "MANAGER" };
 
@@ -16,7 +17,9 @@ export default function CreateClientModal({
   const [me, setMe] = useState<{ role: "ADMIN" | "MANAGER"; id: string } | null>(null);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
 
+  const router = useRouter();
   const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [section, setSection] = useState<"montazh" | "service">(defaultSection);
@@ -87,9 +90,12 @@ export default function CreateClientModal({
         </div>
 
         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+          <Field label="Имя">
+            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={input} />
+          </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Имя">
-              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={input} />
+            <Field label="Отчество">
+              <input value={middleName} onChange={(e) => setMiddleName(e.target.value)} style={input} />
             </Field>
             <Field label="Фамилия">
               <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={input} />
@@ -152,15 +158,22 @@ export default function CreateClientModal({
                     section,
                     firstName: firstName.trim(),
                     lastName: lastName.trim(),
+                    middleName: middleName.trim() || null,
                     phone: phone.trim() || undefined,
                     assignedManagerId: canPickAssignee ? assignedManagerId || null : null,
                   }),
                 });
                 const json = await res.json().catch(() => null);
                 if (!res.ok) throw new Error(json?.error ?? "create_failed");
-                window.location.href = `/clients/${json.clientId}`;
+                setFirstName("");
+                setMiddleName("");
+                setLastName("");
+                setPhone("");
+                onClose();
+                router.refresh();
               } catch {
                 alert("Не удалось создать клиента");
+              } finally {
                 setSaving(false);
               }
             }}

@@ -32,3 +32,27 @@ export async function putObject(uploadUrl: string, blob: Blob) {
   if (!res.ok) throw new Error("Upload failed");
 }
 
+/** PUT with upload progress (percent 0–100). */
+export function putObjectWithProgress(
+  uploadUrl: string,
+  blob: Blob,
+  onProgress: (percent: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.min(100, Math.round((100 * e.loaded) / e.total)));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error("Upload failed"));
+    };
+    xhr.onerror = () => reject(new Error("Upload failed"));
+    xhr.setRequestHeader("Content-Type", blob.type || "application/octet-stream");
+    xhr.send(blob);
+  });
+}
+

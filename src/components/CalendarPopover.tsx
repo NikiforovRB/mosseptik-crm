@@ -1,25 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
-import { formatRuDayMonthWeekday } from "@/lib/date";
+import { formatRuDayMonthWeekday, formatRuMonthYearTitle } from "@/lib/date";
+import { useDismissOnOutsideClick } from "@/hooks/useDismissOnOutsideClick";
 
 export default function CalendarPopover({
   value,
   onChange,
+  allowFuture = false,
 }: {
   value: Date;
   onChange: (d: Date) => void;
+  /** If true, future dates can be selected (e.g. for tasks). */
+  allowFuture?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismissOnOutsideClick(open, close, rootRef);
 
   const grid = useMemo(() => buildMonthGrid(month), [month]);
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={rootRef} style={{ position: "relative" }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -61,9 +68,7 @@ export default function CalendarPopover({
             <button type="button" style={navBtn} onClick={() => setMonth(addMonths(month, -1))}>
               <ChevronLeft size={18} />
             </button>
-            <div style={{ fontWeight: 900, fontSize: 13 }}>
-              {month.toLocaleString("ru-RU", { month: "long", year: "numeric" })}
-            </div>
+            <div style={{ fontWeight: 900, fontSize: 13 }}>{formatRuMonthYearTitle(month)}</div>
             <button type="button" style={navBtn} onClick={() => setMonth(addMonths(month, 1))}>
               <ChevronRight size={18} />
             </button>
@@ -94,10 +99,10 @@ export default function CalendarPopover({
               marginTop: 6,
             }}
           >
-            {grid.map((cell) => {
-              if (!cell) return <div key={Math.random()} />;
+            {grid.map((cell, idx) => {
+              if (!cell) return <div key={`e-${idx}`} />;
               const start = new Date(cell.getFullYear(), cell.getMonth(), cell.getDate()).getTime();
-              const disabled = start > todayStart;
+              const disabled = !allowFuture && start > todayStart;
               const isActive =
                 cell.getFullYear() === value.getFullYear() &&
                 cell.getMonth() === value.getMonth() &&

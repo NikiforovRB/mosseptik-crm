@@ -1,7 +1,14 @@
 "use client";
 
-import type { KanbanFunnel } from "./types";
+import type { KanbanFunnel, KanbanClient } from "./types";
 import { DragOverlay } from "@dnd-kit/core";
+
+function cardDisplayName(c: KanbanClient) {
+  return [c.firstName, c.middleName, c.lastName]
+    .map((s) => (s ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
 
 export default function KanbanCardOverlay({
   funnels,
@@ -37,9 +44,7 @@ export default function KanbanCardOverlay({
             boxShadow: "0 14px 30px rgba(0,0,0,0.16)",
           }}
         >
-          <div style={{ fontWeight: 800, fontSize: 13, color: "#111" }}>
-            {client.firstName} {client.lastName}
-          </div>
+          <div style={{ fontWeight: 800, fontSize: 13, color: "#111" }}>{cardDisplayName(client)}</div>
           <div style={{ fontSize: 12, color: "#555" }}>
             {client.septicModel?.name ?? "—"}
           </div>

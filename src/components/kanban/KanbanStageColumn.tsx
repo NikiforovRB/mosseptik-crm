@@ -36,7 +36,7 @@ export default function KanbanStageColumn({
           display: "flex",
           alignItems: "center",
           gap: 8,
-          borderBottom: `4px solid ${stage.headerColor}`,
+          borderBottom: `2px solid ${stage.headerColor}`,
           borderRadius: 0,
         }}
       >

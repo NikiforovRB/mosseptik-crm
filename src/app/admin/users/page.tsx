@@ -19,10 +19,9 @@ export default async function AdminUsersPage() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", background: "#ffffff" }}>
       <AppHeader />
       <div style={{ padding: 16 }}>
-        <h1 style={{ fontSize: 18, fontWeight: 900, marginBottom: 12 }}>Пользователи</h1>
         <UsersAdmin initial={users as any} />
       </div>
     </div>

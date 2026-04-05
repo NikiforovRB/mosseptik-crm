@@ -39,6 +39,7 @@ export default async function Home({
                 id: true,
                 firstName: true,
                 lastName: true,
+                middleName: true,
                 shortComment: true,
                 qualified: true,
                 moneyProgress: true,
@@ -52,6 +53,7 @@ export default async function Home({
                 assignedManager: {
                   select: { id: true, firstName: true, lastName: true },
                 },
+                nextTask: { select: { dueAt: true, dueHasTime: true } },
               },
             },
           },

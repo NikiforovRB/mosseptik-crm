@@ -1,7 +1,7 @@
 "use client";
 
 import type { KanbanFunnel } from "./types";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   closestCorners,
   DndContext,
@@ -40,6 +40,10 @@ function parseId(raw: string): CardId | StageId | null {
 export default function KanbanBoards({ initial }: { initial: KanbanFunnel[] }) {
   const [funnels, setFunnels] = useState<KanbanFunnel[]>(initial);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFunnels(initial);
+  }, [initial]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 

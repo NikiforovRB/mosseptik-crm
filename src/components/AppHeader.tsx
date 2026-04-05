@@ -1,14 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Users,
-  SlidersHorizontal,
-  Truck,
-  LogOut,
-  Contact,
-} from "lucide-react";
 import { useEffect, useState } from "react";
+
+const ICON = {
+  voronka: "/src/icons/voronka.svg",
+  voronkaNav: "/src/icons/voronka-nav.svg",
+  users: "/src/icons/users.svg",
+  usersNav: "/src/icons/users-nav.svg",
+  septik: "/src/icons/septik.svg",
+  septikNav: "/src/icons/septik-nav.svg",
+  clients: "/src/icons/clients.svg",
+  clientsNav: "/src/icons/clients-nav.svg",
+  exit: "/src/icons/exit.svg",
+  exitNav: "/src/icons/exit-nav.svg",
+  logo: "/src/icons/logo.png",
+} as const;
 
 export default function AppHeader() {
   const [me, setMe] = useState<{
@@ -60,35 +67,53 @@ export default function AppHeader() {
         gap: 16,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <Link
           href="/"
           style={{
-            fontWeight: 800,
-            letterSpacing: 0.5,
-            fontSize: 16,
+            display: "flex",
+            alignItems: "center",
+            border: "none",
+            background: "transparent",
+            textDecoration: "none",
           }}
         >
-          МОССЕПТИК
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={ICON.logo} alt="МОССЕПТИК" style={{ height: 28, width: "auto", display: "block" }} />
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
           {role === "ADMIN" ? (
             <>
-              <Link href="/admin/funnels" title="Настройка воронок" style={iconLinkStyle}>
-                <SlidersHorizontal size={18} />
-              </Link>
-              <Link href="/admin/users" title="Пользователи" style={iconLinkStyle}>
-                <Users size={18} />
-              </Link>
-              <Link href="/admin/septics" title="Септики" style={iconLinkStyle}>
-                <Truck size={18} />
-              </Link>
+              <HoverIconTextLink
+                href="/admin/funnels"
+                title="Настройка воронок"
+                iconDefault={ICON.voronka}
+                iconHover={ICON.voronkaNav}
+                label="Настройка воронок"
+              />
+              <HoverIconTextLink
+                href="/admin/users"
+                title="Пользователи"
+                iconDefault={ICON.users}
+                iconHover={ICON.usersNav}
+                label="Пользователи"
+              />
+              <HoverIconTextLink
+                href="/admin/septics"
+                title="Септики"
+                iconDefault={ICON.septik}
+                iconHover={ICON.septikNav}
+                label="Септики"
+              />
             </>
           ) : null}
-          <Link href="/clients" title="Клиенты" style={clientsLinkStyle}>
-            <Contact size={16} />
-            <span>Клиенты</span>
-          </Link>
+          <HoverIconTextLink
+            href="/clients"
+            title="Клиенты"
+            iconDefault={ICON.clients}
+            iconHover={ICON.clientsNav}
+            label="Клиенты"
+          />
         </div>
       </div>
 
@@ -107,7 +132,7 @@ export default function AppHeader() {
             borderRadius: 999,
             background: "rgba(255,255,255,0.15)",
             overflow: "hidden",
-            border: "1px solid rgba(255,255,255,0.15)",
+            border: "none",
           }}
         >
           {avatarUrl ? (
@@ -119,52 +144,85 @@ export default function AppHeader() {
             />
           ) : null}
         </div>
-        <button
-          type="button"
-          title="Выйти"
-          style={iconButtonStyle}
-          onClick={async () => {
-            await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-            window.location.href = "/login";
-          }}
-        >
-          <LogOut size={18} />
-        </button>
+        <ExitButton />
       </div>
     </header>
   );
 }
 
-const iconButtonStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 10,
-  display: "grid",
-  placeItems: "center",
-  background: "transparent",
-  border: "1px solid rgba(255,255,255,0.15)",
-  color: "#fff",
-  cursor: "pointer",
-};
+function HoverIconTextLink({
+  href,
+  title,
+  iconDefault,
+  iconHover,
+  label,
+}: {
+  href: string;
+  title?: string;
+  iconDefault: string;
+  iconHover: string;
+  label: string;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <Link
+      href={href}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        textDecoration: "none",
+        border: "none",
+        background: "transparent",
+        padding: 0,
+        cursor: "pointer",
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={hover ? iconHover : iconDefault} alt="" width={20} height={20} style={{ display: "block" }} />
+      <span
+        style={{
+          fontSize: 15,
+          color: hover ? "#5A86EE" : "#666666",
+          transition: "color 120ms ease",
+        }}
+      >
+        {label}
+      </span>
+    </Link>
+  );
+}
 
-const iconLinkStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 10,
-  display: "grid",
-  placeItems: "center",
-  border: "1px solid rgba(255,255,255,0.15)",
-};
-
-const clientsLinkStyle: React.CSSProperties = {
-  height: 34,
-  borderRadius: 10,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  border: "1px solid rgba(255,255,255,0.15)",
-  padding: "0 10px",
-  color: "#fff",
-  fontSize: 13,
-};
-
+function ExitButton() {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      title="Выйти"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: 10,
+        display: "grid",
+        placeItems: "center",
+        background: "transparent",
+        border: "none",
+        color: "#fff",
+        cursor: "pointer",
+        padding: 0,
+      }}
+      onClick={async () => {
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        window.location.href = "/login";
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={hover ? ICON.exitNav : ICON.exit} alt="" width={20} height={20} style={{ display: "block" }} />
+    </button>
+  );
+}

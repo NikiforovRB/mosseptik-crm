@@ -34,6 +34,7 @@ export default async function ClientsPage({
       id: true,
       firstName: true,
       lastName: true,
+      middleName: true,
       phone: true,
       assignedManager: {
         select: { id: true, firstName: true, lastName: true },
@@ -42,7 +43,7 @@ export default async function ClientsPage({
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f1f1" }}>
+    <div style={{ minHeight: "100vh", background: "#ffffff" }}>
       <AppHeader />
       <div style={{ padding: 16, display: "grid", gap: 12 }}>
         <div style={{ fontSize: 18 }}>Клиенты</div>

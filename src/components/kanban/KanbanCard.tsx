@@ -4,24 +4,29 @@ import type { KanbanClient } from "./types";
 import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  BadgeCheck,
-  BadgeX,
-  CalendarDays,
-  CircleDollarSign,
-  CircleCheck,
-  CircleHelp,
-  CircleSlash,
-} from "lucide-react";
-import { commDateColor, formatRuDayMonthWeekday } from "@/lib/date";
+const ICON_QUALIFIED = "/src/icons/active.svg";
+const ICON_NOT_QUALIFIED = "/src/icons/not-active.svg";
+import { formatRuDayMonthWeekdayMoscow, nextTaskDueColor } from "@/lib/date";
+import { MONEY_PROGRESS_ICON_SRC } from "@/lib/moneyProgressIcons";
+
+function cardDisplayName(c: KanbanClient) {
+  return [c.firstName, c.middleName, c.lastName]
+    .map((s) => (s ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
 
 export default function KanbanCard({ client }: { client: KanbanClient }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: `card:${client.id}` });
 
-  const lastComm = client.lastCommunicationAt
-    ? new Date(client.lastCommunicationAt)
-    : null;
+  const nextDue = client.nextTask?.dueAt ? new Date(client.nextTask.dueAt) : null;
+  const nextHasTime = client.nextTask?.dueHasTime ?? false;
+  const NO_TASK_COLOR = "#a4a4a4";
+  const nextLabel = nextDue
+    ? formatRuDayMonthWeekdayMoscow(nextDue, nextHasTime)
+    : "Нет задачи";
+  const nextColor = nextDue ? nextTaskDueColor(nextDue, nextHasTime) : NO_TASK_COLOR;
 
   return (
     <Link
@@ -51,15 +56,13 @@ export default function KanbanCard({ client }: { client: KanbanClient }) {
             Срочно
           </div>
         ) : null}
-        <div style={{ fontWeight: 800, fontSize: 13, color: "#111" }}>
-          {client.firstName} {client.lastName}
-        </div>
-        <div style={{ fontSize: 12, color: "#555" }}>
-          {client.septicModel?.name ?? "—"}
-        </div>
-        <div style={{ fontSize: 12, color: "#777", minHeight: 16 }}>
-          {client.shortComment || " "}
-        </div>
+        <div style={{ fontWeight: 800, fontSize: 13, color: "#111" }}>{cardDisplayName(client)}</div>
+        {client.septicModel?.name?.trim() ? (
+          <div style={{ fontSize: 12, color: "#555" }}>{client.septicModel.name}</div>
+        ) : null}
+        {(client.shortComment ?? "").trim() ? (
+          <div style={{ fontSize: 12, color: "#777" }}>{client.shortComment}</div>
+        ) : null}
 
         <div
           style={{
@@ -70,16 +73,24 @@ export default function KanbanCard({ client }: { client: KanbanClient }) {
             gap: 10,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#999" }}>
-            <CalendarDays size={14} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: nextColor,
+                flexShrink: 0,
+              }}
+            />
             <span
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                color: lastComm ? commDateColor(lastComm) : "#8b8b8b",
+                color: nextColor,
               }}
             >
-              {lastComm ? formatRuDayMonthWeekday(lastComm) : "—"}
+              {nextLabel}
             </span>
           </div>
         </div>
@@ -93,17 +104,37 @@ export default function KanbanCard({ client }: { client: KanbanClient }) {
           paddingRight: 12,
         }}
       >
-        <IconPill title={client.qualified ? "Квалифицирован" : "Не квалифицирован"}>
-          {client.qualified ? <BadgeCheck size={16} /> : <BadgeX size={16} />}
-        </IconPill>
-        <IconPill title={moneyProgressTitle(client.moneyProgress)}>
-          {moneyProgressIcon(client.moneyProgress)}
-        </IconPill>
-        <IconPill title={client.gsoType === "GSO1" ? "ГСО 1" : "ГСО 2"}>
-          <span style={{ fontSize: 11, fontWeight: 900 }}>
-            {client.gsoType === "GSO1" ? "ГСО1" : "ГСО2"}
-          </span>
-        </IconPill>
+        {client.qualified !== null ? (
+          <IconPill title={client.qualified ? "Квалифицирован" : "Не квалифицирован"}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={client.qualified ? ICON_QUALIFIED : ICON_NOT_QUALIFIED}
+              alt=""
+              width={16}
+              height={16}
+              style={{ display: "block" }}
+            />
+          </IconPill>
+        ) : null}
+        {client.moneyProgress != null ? (
+          <IconPill title={moneyProgressTitle(client.moneyProgress)}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={MONEY_PROGRESS_ICON_SRC[client.moneyProgress]}
+              alt=""
+              width={16}
+              height={16}
+              style={{ display: "block" }}
+            />
+          </IconPill>
+        ) : null}
+        {client.gsoType != null ? (
+          <IconPill title={client.gsoType === "GSO1" ? "ГСО 1" : "ГСО 2"}>
+            <span style={{ fontSize: 11, fontWeight: 900 }}>
+              {client.gsoType === "GSO1" ? "ГСО1" : "ГСО2"}
+            </span>
+          </IconPill>
+        ) : null}
       </div>
     </Link>
   );
@@ -135,7 +166,7 @@ function IconPill({
   );
 }
 
-function moneyProgressTitle(v: KanbanClient["moneyProgress"]) {
+function moneyProgressTitle(v: NonNullable<KanbanClient["moneyProgress"]>) {
   switch (v) {
     case "ASSIGNED":
       return "Назначен";
@@ -147,21 +178,6 @@ function moneyProgressTitle(v: KanbanClient["moneyProgress"]) {
       return "Состоялся без денег";
     default:
       return "Статус";
-  }
-}
-
-function moneyProgressIcon(v: KanbanClient["moneyProgress"]) {
-  switch (v) {
-    case "ASSIGNED":
-      return <CircleHelp size={16} />;
-    case "CONFIRMED":
-      return <CircleCheck size={16} />;
-    case "DONE_WITH_MONEY":
-      return <CircleDollarSign size={16} />;
-    case "DONE_WITHOUT_MONEY":
-      return <CircleSlash size={16} />;
-    default:
-      return <CircleHelp size={16} />;
   }
 }
 

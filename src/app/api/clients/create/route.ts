@@ -7,6 +7,7 @@ const BodySchema = z.object({
   section: z.enum(["montazh", "service"]).default("montazh"),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
+  middleName: z.string().optional().nullable(),
   phone: z.string().optional(),
   assignedManagerId: z.string().optional().nullable(),
 });
@@ -37,10 +38,12 @@ export async function POST(req: Request) {
   });
   const nextOrder = (last?.orderInStage ?? -1) + 1;
 
+  const middle = (parsed.data.middleName ?? "").trim();
   const created = await prisma.client.create({
     data: {
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
+      middleName: middle ? middle : null,
       phone: parsed.data.phone ? parsed.data.phone : null,
       shortComment: "",
       funnelStageId: firstStage.id,

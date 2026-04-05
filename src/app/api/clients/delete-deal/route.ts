@@ -28,6 +28,7 @@ export async function POST(req: Request) {
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.clientNextTask.deleteMany({ where: { clientId } });
     await tx.communication.deleteMany({ where: { clientId } });
     await tx.client.update({
       where: { id: clientId },
