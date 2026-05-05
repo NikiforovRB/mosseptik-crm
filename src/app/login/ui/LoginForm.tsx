@@ -36,7 +36,7 @@ export default function LoginForm() {
           setLoading(false);
         }
       }}
-      style={{ display: "grid", gap: 12 }}
+      style={{ display: "grid", gap: 12, textAlign: "left" }}
     >
       <label style={{ display: "grid", gap: 6 }}>
         <span style={{ fontSize: 12, color: "#555" }}>Логин</span>

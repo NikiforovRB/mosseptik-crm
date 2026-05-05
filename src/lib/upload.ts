@@ -6,7 +6,7 @@ const PresignResponseSchema = z.object({
 });
 
 export async function presignUpload(input: {
-  purpose: "communicationPhoto" | "avatar";
+  purpose: "communicationPhoto" | "avatar" | "septicImage";
   variant: "original" | "webp";
   contentType: string;
   ext: string;

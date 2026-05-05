@@ -13,11 +13,11 @@ export default async function LoginPage() {
         display: "grid",
         placeItems: "center",
         padding: 24,
-        background: "#fafafa",
+        background: "#ffffff",
         color: "#111",
       }}
     >
-      <div style={{ width: "100%", maxWidth: 360 }}>
+      <div style={{ width: "100%", maxWidth: 360, textAlign: "center" }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
           МОССЕПТИК CRM
         </h1>

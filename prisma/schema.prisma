@@ -47,11 +47,27 @@ model FunnelStage {
 }
 
 model SepticModel {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  clients   Client[]
+  id                String              @id @default(cuid())
+  name              String              @unique
+  purchasePrice     Int?
+  salePrice         Int?
+  imageOriginalKey  String?
+  imageWebpKey      String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  clients           Client[]
+  priceHistoryItems SepticPriceHistory[]
+}
+
+model SepticPriceHistory {
+  id            String               @id @default(cuid())
+  septicModelId String
+  kind          SepticPriceKind
+  price         Int
+  createdAt     DateTime             @default(now())
+  septicModel   SepticModel          @relation(fields: [septicModelId], references: [id], onDelete: Cascade)
+
+  @@index([septicModelId, kind, createdAt])
 }
 
 model Client {
@@ -145,4 +161,9 @@ enum GsoType {
 enum CommunicationKind {
   STANDARD
   TASK_COMPLETED
+}
+
+enum SepticPriceKind {
+  PURCHASE
+  SALE
 }

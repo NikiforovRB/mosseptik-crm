@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import { requireUser } from "@/lib/serverAuth";
 
 const BodySchema = z.object({
-  purpose: z.enum(["communicationPhoto", "avatar"]),
+  purpose: z.enum(["communicationPhoto", "avatar", "septicImage"]),
   contentType: z.string().min(1),
   ext: z.string().min(1).max(10),
   variant: z.enum(["original", "webp"]),
