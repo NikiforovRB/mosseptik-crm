@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fileToWebpBlob } from "@/lib/image";
 import { presignUpload, putObject } from "@/lib/upload";
+import { moscowWallToUtc } from "@/lib/date";
 
 type PriceHistoryRow = {
   id: string;
@@ -45,12 +46,49 @@ function fmtHistoryDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function isoToMoscowInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  const yyyy = get("year");
+  const mm = get("month");
+  const dd = get("day");
+  let hh = get("hour");
+  const mi = get("minute");
+  if (hh === "24") hh = "00";
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function moscowInputToIso(local: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local.trim());
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const d = parseInt(m[3], 10);
+  const hh = parseInt(m[4], 10);
+  const mi = parseInt(m[5], 10);
+  if (![y, mo, d, hh, mi].every(Number.isFinite)) return null;
+  const utc = moscowWallToUtc(y, mo, d, hh, mi);
+  if (Number.isNaN(utc.getTime())) return null;
+  return utc.toISOString();
 }
 
 export default function SepticsAdmin({ initial }: { initial: Row[] }) {
@@ -226,6 +264,11 @@ function SepticRow({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [saveHover, setSaveHover] = useState(false);
   const [photoHover, setPhotoHover] = useState(false);
+  const [historyEdit, setHistoryEdit] = useState<PriceHistoryRow | null>(null);
+  const [historyEditValue, setHistoryEditValue] = useState("");
+  const [historyEditDate, setHistoryEditDate] = useState("");
+  const [historyEditSaving, setHistoryEditSaving] = useState(false);
+  const [historySaveHover, setHistorySaveHover] = useState(false);
 
   useEffect(() => {
     setName(row.name);
@@ -275,7 +318,87 @@ function SepticRow({
     parsePrice(purchasePrice) !== row.purchasePrice ||
     parsePrice(salePrice) !== row.salePrice;
 
+  const isHistoryEditDirty = useMemo(() => {
+    if (!historyEdit) return false;
+    const priceChanged = historyEditValue !== fmtPrice(historyEdit.price);
+    const dateChanged = historyEditDate !== "" && historyEditDate !== isoToMoscowInput(historyEdit.createdAt);
+    return priceChanged || dateChanged;
+  }, [historyEdit, historyEditValue, historyEditDate]);
+
+  const openHistoryEdit = (h: PriceHistoryRow) => {
+    setHistoryEdit(h);
+    setHistoryEditValue(fmtPrice(h.price));
+    setHistoryEditDate(isoToMoscowInput(h.createdAt));
+  };
+  const closeHistoryEdit = () => {
+    if (historyEditSaving) return;
+    setHistoryEdit(null);
+  };
+  const submitHistoryEdit = async () => {
+    if (!historyEdit) return;
+    const body: { price?: number; createdAt?: string } = {};
+
+    if (historyEditValue !== fmtPrice(historyEdit.price)) {
+      const p = parsePrice(historyEditValue);
+      if (p === null || Number.isNaN(p)) {
+        alert("Цена должна быть положительным числом");
+        return;
+      }
+      body.price = p;
+    }
+
+    if (historyEditDate && historyEditDate !== isoToMoscowInput(historyEdit.createdAt)) {
+      const iso = moscowInputToIso(historyEditDate);
+      if (!iso) {
+        alert("Введите корректную дату");
+        return;
+      }
+      body.createdAt = iso;
+    }
+
+    if (Object.keys(body).length === 0) {
+      setHistoryEdit(null);
+      return;
+    }
+
+    setHistoryEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/septics/history/${historyEdit.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        alert("Не удалось изменить запись истории");
+        return;
+      }
+      const json = await res.json();
+      const nextHistory = row.priceHistoryItems.map((x) => (x.id === historyEdit.id ? json.item : x));
+      onChange({ ...row, priceHistoryItems: nextHistory });
+      setHistoryEdit(null);
+    } finally {
+      setHistoryEditSaving(false);
+    }
+  };
+  const deleteHistoryItem = async (h: PriceHistoryRow) => {
+    if (!confirm("Удалить запись истории?")) return;
+    const res = await fetch(`/api/admin/septics/history/${h.id}`, { method: "DELETE" });
+    if (!res.ok) return alert("Не удалось удалить запись истории");
+    const nextHistory = row.priceHistoryItems.filter((x) => x.id !== h.id);
+    onChange({ ...row, priceHistoryItems: nextHistory });
+  };
+
+  useEffect(() => {
+    if (!historyEdit) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !historyEditSaving) setHistoryEdit(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [historyEdit, historyEditSaving]);
+
   return (
+    <>
     <div
       style={{
         display: "grid",
@@ -369,31 +492,7 @@ function SepticRow({
           {showPurchaseHistory ? "Скрыть историю" : "История закупки"}
         </button>
         {showPurchaseHistory ? (
-          <HistoryBox
-            rows={purchaseHistory}
-            onEdit={async (h) => {
-              const nextRaw = prompt("Новая цена:", String(h.price));
-              if (nextRaw === null) return;
-              const p = parsePrice(nextRaw);
-              if (p === null || Number.isNaN(p)) return alert("Цена должна быть положительным числом");
-              const res = await fetch(`/api/admin/septics/history/${h.id}`, {
-                method: "PATCH",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ price: p }),
-              });
-              if (!res.ok) return alert("Не удалось изменить запись истории");
-              const json = await res.json();
-              const nextHistory = row.priceHistoryItems.map((x) => (x.id === h.id ? json.item : x));
-              onChange({ ...row, priceHistoryItems: nextHistory });
-            }}
-            onDelete={async (h) => {
-              if (!confirm("Удалить запись истории?")) return;
-              const res = await fetch(`/api/admin/septics/history/${h.id}`, { method: "DELETE" });
-              if (!res.ok) return alert("Не удалось удалить запись истории");
-              const nextHistory = row.priceHistoryItems.filter((x) => x.id !== h.id);
-              onChange({ ...row, priceHistoryItems: nextHistory });
-            }}
-          />
+          <HistoryBox rows={purchaseHistory} onEdit={openHistoryEdit} onDelete={deleteHistoryItem} />
         ) : null}
       </div>
 
@@ -408,31 +507,7 @@ function SepticRow({
           {showSaleHistory ? "Скрыть историю" : "История продажи"}
         </button>
         {showSaleHistory ? (
-          <HistoryBox
-            rows={saleHistory}
-            onEdit={async (h) => {
-              const nextRaw = prompt("Новая цена:", String(h.price));
-              if (nextRaw === null) return;
-              const p = parsePrice(nextRaw);
-              if (p === null || Number.isNaN(p)) return alert("Цена должна быть положительным числом");
-              const res = await fetch(`/api/admin/septics/history/${h.id}`, {
-                method: "PATCH",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ price: p }),
-              });
-              if (!res.ok) return alert("Не удалось изменить запись истории");
-              const json = await res.json();
-              const nextHistory = row.priceHistoryItems.map((x) => (x.id === h.id ? json.item : x));
-              onChange({ ...row, priceHistoryItems: nextHistory });
-            }}
-            onDelete={async (h) => {
-              if (!confirm("Удалить запись истории?")) return;
-              const res = await fetch(`/api/admin/septics/history/${h.id}`, { method: "DELETE" });
-              if (!res.ok) return alert("Не удалось удалить запись истории");
-              const nextHistory = row.priceHistoryItems.filter((x) => x.id !== h.id);
-              onChange({ ...row, priceHistoryItems: nextHistory });
-            }}
-          />
+          <HistoryBox rows={saleHistory} onEdit={openHistoryEdit} onDelete={deleteHistoryItem} />
         ) : null}
       </div>
 
@@ -481,6 +556,106 @@ function SepticRow({
         Удалить
       </button>
     </div>
+
+    {historyEdit ? (
+      <div
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) closeHistoryEdit();
+        }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          display: "grid",
+          placeItems: "center",
+          padding: 20,
+          zIndex: 80,
+        }}
+      >
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            background: "#fff",
+            borderRadius: 14,
+            border: "1px solid #eee",
+            padding: 20,
+            display: "grid",
+            gap: 14,
+            boxShadow: "0 18px 50px rgba(0,0,0,0.2)",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 900, color: "#111" }}>
+            Изменить запись {historyEdit.kind === "PURCHASE" ? "закупки" : "продажи"}
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <label style={{ fontSize: 12, color: "#666" }}>Цена</label>
+            <input
+              autoFocus
+              value={historyEditValue}
+              onChange={(e) => setHistoryEditValue(formatPriceInput(e.target.value))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && isHistoryEditDirty && !historyEditSaving) {
+                  e.preventDefault();
+                  void submitHistoryEdit();
+                }
+              }}
+              placeholder="0 ₽"
+              inputMode="numeric"
+              style={{ ...input, height: 44, fontSize: 15 }}
+            />
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <label style={{ fontSize: 12, color: "#666" }}>Дата и время</label>
+            <input
+              type="datetime-local"
+              value={historyEditDate}
+              onChange={(e) => setHistoryEditDate(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && isHistoryEditDirty && !historyEditSaving) {
+                  e.preventDefault();
+                  void submitHistoryEdit();
+                }
+              }}
+              style={{ ...input, height: 44, fontSize: 15 }}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+            <button
+              type="button"
+              style={{ ...ghostBtn, height: 38, fontSize: 13, padding: "0 14px" }}
+              onClick={closeHistoryEdit}
+              disabled={historyEditSaving}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              disabled={!isHistoryEditDirty || historyEditSaving}
+              onMouseEnter={() => setHistorySaveHover(true)}
+              onMouseLeave={() => setHistorySaveHover(false)}
+              style={{
+                ...secondaryBtn,
+                color: isHistoryEditDirty && !historyEditSaving ? "#0f68e4" : "#999",
+                borderColor:
+                  isHistoryEditDirty && !historyEditSaving && historySaveHover ? "#0f68e4" : "#ededed",
+                cursor: isHistoryEditDirty && !historyEditSaving ? "pointer" : "default",
+              }}
+              onClick={() => void submitHistoryEdit()}
+            >
+              {historyEditSaving ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }
 
